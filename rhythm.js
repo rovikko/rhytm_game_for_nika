@@ -86,9 +86,9 @@ function showBeatMessage(msg) {
 }
 
 // ===================================================================================================================================
-// rhythm interval - core of game 
-// contains logic of arrows and BEAT check 
-// logic for score and combo 
+// rhythm interval - core of game
+// contains logic of arrows and BEAT check
+// logic for score and combo
 // ===================================================================================================================================
 let SCORE = 0;
 let COMBO = 1;
@@ -129,7 +129,7 @@ class RhytmInterval {
       this.memorizedTimestamp + this.duration * this.beatTimingFraction;
 
     const offBEATDiff = idealBEAT - time;
-     
+
     // if offBEATDiff > 0 - it means player pressed later
     // if < 0 - pressed earlier
     if (Math.abs(offBEATDiff) < PERFECT_THRESHOLD) {
@@ -146,7 +146,7 @@ class RhytmInterval {
       comboFail();
     }
     // every Beat add score of 1000
-    addComboScore(1000); 
+    addComboScore(1000);
 
     this.checkTries.push({
       ratio: (time - this.memorizedTimestamp) / this.duration,
@@ -188,6 +188,7 @@ let CURRENT_TIME = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+  setupIntervalCreation();
 }
 
 function draw() {
@@ -205,7 +206,10 @@ function draw() {
 
     // ideal BEAT marker
     strokeWeight(5);
-    point(LINE_START_X + LINE_LEN * CURRENT_INTERVAL.beatTimingFraction, LINE_Y);
+    point(
+      LINE_START_X + LINE_LEN * CURRENT_INTERVAL.beatTimingFraction,
+      LINE_Y,
+    );
 
     // BEAT accuracy point display
     for (const tri of CURRENT_INTERVAL.checkTries) {
@@ -281,6 +285,10 @@ let setIntervalId = 0;
 function setupIntervalCreation() {
   const intervalLogic = () => {
     if (CURRENT_INTERVAL) {
+      if(!CURRENT_INTERVAL.BEATchecked){
+        comboFail()
+        showBeatMessage('beat missed!')
+      }
       CURRENT_INTERVAL = null;
     }
 
@@ -312,9 +320,6 @@ function setupIntervalCreation() {
 function keyPressed(event) {
   console.log(event);
   if (event.code === "Space") {
-    if (!INTERVAL_STARTED) {
-      setupIntervalCreation();
-    }
 
     if (CURRENT_INTERVAL && !CURRENT_INTERVAL.BEATchecked) {
       if (!CURRENT_INTERVAL.arrowsFinished) {
