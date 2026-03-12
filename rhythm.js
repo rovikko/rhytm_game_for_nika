@@ -1,23 +1,18 @@
-class Game {
-  started = false;
+// ===================================================================================================================================
+// arrows
+// ===================================================================================================================================
 
-  start() {
-    this.started = true;
-  }
-}
-
-let ARROW_TYPE = {
+const ARROW_TYPE = {
   UP: 0,
   DOWN: 1,
   RIGHT: 2,
   LEFT: 3,
 };
-let ARROW_STATE = {
+const ARROW_STATE = {
   UNPRESSED: 0,
   PASSED: 1,
   FAILED: 2,
 };
-
 class Arrow {
   type = 0;
   state = 0;
@@ -27,7 +22,6 @@ class Arrow {
     this.state = ARROW_STATE.UNPRESSED;
   }
 }
-
 function generateRandomArrows(count) {
   let tempArray = [];
   for (let i = 0; i < count; i++) {
@@ -42,7 +36,10 @@ function generateRandomArrows(count) {
   }
   return tempArray;
 }
-
+// ===================================================================================================================================
+// temporary message
+// ===================================================================================================================================
+let CURRENT_NOTE;
 class TextNotify {
   constructor(msg, durationSec) {
     this.msg = msg;
@@ -84,6 +81,27 @@ class TextNotify {
     pop();
   }
 }
+function showBeatMessage(msg) {
+  CURRENT_NOTE = new TextNotify(msg, 0.5);
+}
+
+// ===================================================================================================================================
+// rhythm interval - core of game 
+// contains logic of arrows and BEAT check 
+// logic for score and combo 
+// ===================================================================================================================================
+let SCORE = 0;
+let COMBO = 1;
+function comboFail() {
+  COMBO = 1;
+}
+function addComboScore(score) {
+  SCORE += score * COMBO;
+}
+
+const PERFECT_THRESHOLD = 100;
+const GREAT_THRESHOLD = 200;
+const OK_THRESHOLD = 300;
 
 class RhytmInterval {
   duration = 3000;
@@ -103,43 +121,32 @@ class RhytmInterval {
     this.difficulty = difficulty;
     this.onDestroy = callback;
     this.duration = duration;
-
-    console.log("started interval");
-
-    // this.timeoutId = setTimeout(() => {
-    //   console.log(
-    //     "interval started at ",
-    //     this.memorizedTimestamp,
-    //     "and died after",
-    //     this.duration,
-    //     "millis",
-    //   );
-
-    //   this.onDestroy();
-    // }, this.duration - 50);
-
     this.arrows = generateRandomArrows(this.difficulty);
   }
 
   checkBeat(time) {
-    console.log((time - this.memorizedTimestamp) / this.duration);
-
     const idealBEAT =
       this.memorizedTimestamp + this.duration * this.beatTimingFraction;
 
     const offBEATDiff = idealBEAT - time;
-    console.log("idealBEAT", idealBEAT);
-    console.log("currentTime", time);
-    console.log("offBEATDiff", offBEATDiff);
+     
     // if offBEATDiff > 0 - it means player pressed later
     // if < 0 - pressed earlier
-
-    const threshold = 100; // 100ms, 0.1 seconds
-    if (Math.abs(offBEATDiff) < threshold) {
-      console.log("perfect");
+    if (Math.abs(offBEATDiff) < PERFECT_THRESHOLD) {
+      showBeatMessage("Perfect!");
+      COMBO += 5;
+    } else if (Math.abs(offBEATDiff) < GREAT_THRESHOLD) {
+      COMBO += 3;
+      showBeatMessage("Great!");
+    } else if (Math.abs(offBEATDiff) < OK_THRESHOLD) {
+      showBeatMessage("Ok!");
+      COMBO += 1;
     } else {
-      console.log("not perfect");
+      showBeatMessage("bruh");
+      comboFail();
     }
+    // every Beat add score of 1000
+    addComboScore(1000); 
 
     this.checkTries.push({
       ratio: (time - this.memorizedTimestamp) / this.duration,
@@ -154,7 +161,7 @@ class RhytmInterval {
       currentArrow.type === type ? ARROW_STATE.PASSED : ARROW_STATE.FAILED;
 
     if (currentArrow.state === ARROW_STATE.PASSED) {
-      SCORE += 100 * COMBO;
+      addComboScore(100);
       COMBO++;
     } else {
       comboFail();
@@ -171,26 +178,17 @@ class RhytmInterval {
     // this.onDestroy();
   }
 }
-
-const startX = 50;
-const lineY = 200;
-const lineLength = 300;
-
-let game = new Game();
-
-let SCORE = 0;
-let COMBO = 1;
-
-function comboFail() {
-  COMBO = 1;
-}
+// ===================================================================================================================================
+// setup and draw logic for all visuals
+// ===================================================================================================================================
+const LINE_START_X = 50;
+const LINE_Y = 200;
+const LINE_LEN = 300;
+let CURRENT_TIME = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
 }
-let CURRENT_TIME = 0;
-
-let currentNote;
 
 function draw() {
   background(0);
@@ -198,49 +196,45 @@ function draw() {
   stroke(255);
   CURRENT_TIME = millis();
 
-  if (currentInterval) {
+  if (CURRENT_INTERVAL) {
     // interval drawing
     // ------------------------------------------------------------
-    let duration = currentInterval.duration;
+    let duration = CURRENT_INTERVAL.duration;
 
-    line(startX, lineY, startX + lineLength, lineY);
+    line(LINE_START_X, LINE_Y, LINE_START_X + LINE_LEN, LINE_Y);
 
     // ideal BEAT marker
     strokeWeight(5);
-    point(startX + lineLength * currentInterval.beatTimingFraction, lineY);
+    point(LINE_START_X + LINE_LEN * CURRENT_INTERVAL.beatTimingFraction, LINE_Y);
 
-    // debug
-    for (const tri of currentInterval.checkTries) {
+    // BEAT accuracy point display
+    for (const tri of CURRENT_INTERVAL.checkTries) {
       push();
       if (Math.abs(tri.diff) < 100) {
         stroke("cyan");
-        currentNote = new TextNotify("Perfect!", 0.5);
       } else if (Math.abs(tri.diff) < 200) {
         stroke(0, 255, 0);
-        currentNote = new TextNotify("Great!", 0.5);
       } else if (Math.abs(tri.diff) < 300) {
         stroke("yellow");
-        currentNote = new TextNotify("Ok!", 0.5);
       } else {
         stroke("red");
-        currentNote = new TextNotify("bruh...", 0.5);
       }
-      point(startX + lineLength * tri.ratio, lineY);
+      point(LINE_START_X + LINE_LEN * tri.ratio, LINE_Y);
       pop();
     }
 
     strokeWeight(1);
 
     let elapsed =
-      (CURRENT_TIME - currentInterval.memorizedTimestamp) % duration;
+      (CURRENT_TIME - CURRENT_INTERVAL.memorizedTimestamp) % duration;
     let progress = elapsed / duration;
-    let currentX = startX + progress * lineLength;
-    ellipse(currentX, lineY, 20, 20);
+    let currentX = LINE_START_X + progress * LINE_LEN;
+    ellipse(currentX, LINE_Y, 20, 20);
     // ------------------------------------------------------------
 
     // arrows
     let x = 0;
-    for (let arr of currentInterval.arrows) {
+    for (let arr of CURRENT_INTERVAL.arrows) {
       push();
       if (arr.state === ARROW_STATE.FAILED) {
         fill(255, 0, 0);
@@ -248,7 +242,7 @@ function draw() {
       if (arr.state === ARROW_STATE.PASSED) {
         fill(0, 255, 0);
       }
-      drawTypedArrow(startX + x, lineY + 50, 40, arr.type);
+      drawTypedArrow(LINE_START_X + x, LINE_Y + 50, 40, arr.type);
       pop();
       x += 50;
     }
@@ -256,49 +250,44 @@ function draw() {
 
     // level label
     fill(255);
-    const label = `LEVEL ${currentInterval.difficulty}`;
+    const label = `LEVEL ${CURRENT_INTERVAL.difficulty}`;
     textSize(30);
-    text(label, startX, 350); // TODO: 150px ?
+    text(label, LINE_START_X, 350); // TODO: 150px ?
     const score = `SCORE ${SCORE}`;
     textSize(20);
-    text(score, startX, 100);
+    text(score, LINE_START_X, 100);
     const combo = `${COMBO}x`;
     textSize(20);
-    text(combo, startX + 350, 200);
+    text(combo, LINE_START_X + 350, 200);
 
     // ------------------------------------------------------------
-
-    if (currentNote && !currentNote.isFinished) {
-      currentNote.update();
-      currentNote.display();
+    // temrorary message
+    if (CURRENT_NOTE && !CURRENT_NOTE.isFinished) {
+      CURRENT_NOTE.update();
+      CURRENT_NOTE.display();
     }
-  } else {
   }
-
-  // ellipse(50, 50, 50);
 }
-
-let currentInterval = null;
+// ===================================================================================================================================
+// logic related to interval re-instantiation
+// ===================================================================================================================================
+let CURRENT_INTERVAL = null;
 const DURATION = 3500;
 let DIFFICULTY = 3;
 let INTERVAL_STARTED = false;
-let intervalId = 0;
-
 let INTERVAL_COUNT = 1;
+let setIntervalId = 0;
 
 function setupIntervalCreation() {
   const intervalLogic = () => {
-    if (currentInterval) {
-      currentInterval.destroy();
-      currentInterval = null;
+    if (CURRENT_INTERVAL) {
+      CURRENT_INTERVAL = null;
     }
 
-    currentInterval = new RhytmInterval();
-    currentInterval.start(CURRENT_TIME, DIFFICULTY, DURATION, () => {
-      // need this ?
-      console.log("cleared currentInterval");
-      currentInterval.destroy();
-      currentInterval = null;
+    CURRENT_INTERVAL = new RhytmInterval();
+    CURRENT_INTERVAL.start(CURRENT_TIME, DIFFICULTY, DURATION, () => {
+      // TODO: need this ?
+      CURRENT_INTERVAL = null;
     });
     INTERVAL_COUNT++;
 
@@ -312,17 +301,14 @@ function setupIntervalCreation() {
   };
 
   intervalLogic();
-  intervalId = setInterval(intervalLogic, DURATION);
+  setIntervalId = setInterval(intervalLogic, DURATION);
 
   INTERVAL_STARTED = true;
 }
 
-// function createInterval() {
-//   currentInterval.start(CURRENT_TIME, 3, () => {
-//     console.log("cleared currentInterval");
-//   });
-// }
-
+// ===================================================================================================================================
+// keys hanlers
+// ===================================================================================================================================
 function keyPressed(event) {
   console.log(event);
   if (event.code === "Space") {
@@ -330,31 +316,30 @@ function keyPressed(event) {
       setupIntervalCreation();
     }
 
-    if (currentInterval && !currentInterval.BEATchecked) {
-      if (!currentInterval.arrowsFinished) {
-        console.log("cannot BEAT");
+    if (CURRENT_INTERVAL && !CURRENT_INTERVAL.BEATchecked) {
+      if (!CURRENT_INTERVAL.arrowsFinished) {
+        console.log("cannot BEAT before arrows");
       } else {
-        currentInterval.checkBeat(CURRENT_TIME);
-        // currentInterval.destroy();
+        CURRENT_INTERVAL.checkBeat(CURRENT_TIME);
       }
     }
   }
-  if (currentInterval && !currentInterval.arrowsFinished) {
-    console.log("process arrow");
+  if (CURRENT_INTERVAL && !CURRENT_INTERVAL.arrowsFinished) {
     if (event.code === "ArrowUp") {
-      currentInterval.checkArrow(ARROW_TYPE.UP);
+      CURRENT_INTERVAL.checkArrow(ARROW_TYPE.UP);
     }
     if (event.code === "ArrowDown") {
-      currentInterval.checkArrow(ARROW_TYPE.DOWN);
+      CURRENT_INTERVAL.checkArrow(ARROW_TYPE.DOWN);
     }
     if (event.code === "ArrowLeft") {
-      currentInterval.checkArrow(ARROW_TYPE.LEFT);
+      CURRENT_INTERVAL.checkArrow(ARROW_TYPE.LEFT);
     }
     if (event.code === "ArrowRight") {
-      currentInterval.checkArrow(ARROW_TYPE.RIGHT);
+      CURRENT_INTERVAL.checkArrow(ARROW_TYPE.RIGHT);
     }
   }
 }
+// ===================================================================================================================================
 
 function drawArrowShape(size) {
   beginShape();
@@ -375,7 +360,7 @@ function drawTypedArrow(x, y, size, type) {
   if (type === ARROW_TYPE.UP) rotate(-HALF_PI);
   else if (type === ARROW_TYPE.DOWN) rotate(HALF_PI);
   else if (type === ARROW_TYPE.LEFT) rotate(PI);
-  // RIGHT (2) — no roration
+  // RIGHT (2) — no rotation
 
   drawArrowShape(size);
   pop();
