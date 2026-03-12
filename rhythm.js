@@ -41,12 +41,17 @@ function generateRandomArrows(count) {
 // ===================================================================================================================================
 let CURRENT_NOTE;
 class TextNotify {
-  constructor(msg, durationSec) {
+  constructor(msg, durationSec, color) {
     this.msg = msg;
     this.duration = durationSec * 1000;
     this.startTime = millis();
     this.isFinished = false;
     this.fadeTime = 500;
+    this.color = color;
+
+    const offset = 20; 
+    this.offsetX = random(-offset, offset);
+    this.offsetY = random(-offset, offset);
   }
 
   update() {
@@ -73,16 +78,19 @@ class TextNotify {
     }
 
     push();
-    // fill(0, alpha);
-    // noStroke();
+    strokeWeight(0);
+    if (this.color) {
+      fill(this.color);
+      stroke(this.color);
+    }
     textAlign(CENTER, CENTER);
-    textSize(20);
-    text(this.msg, 250, 150);
+    textSize(25);
+    text(this.msg, 250 + this.offsetX, 150 + this.offsetY);
     pop();
   }
 }
-function showBeatMessage(msg) {
-  CURRENT_NOTE = new TextNotify(msg, 0.5);
+function showBeatMessage(msg, color) {
+  CURRENT_NOTE = new TextNotify(msg, 0.5, color);
 }
 
 // ===================================================================================================================================
@@ -133,16 +141,16 @@ class RhytmInterval {
     // if offBEATDiff > 0 - it means player pressed later
     // if < 0 - pressed earlier
     if (Math.abs(offBEATDiff) < PERFECT_THRESHOLD) {
-      showBeatMessage("Perfect!");
+      showBeatMessage("Perfect!", "cyan");
       COMBO += 5;
     } else if (Math.abs(offBEATDiff) < GREAT_THRESHOLD) {
       COMBO += 3;
-      showBeatMessage("Great!");
+      showBeatMessage("Great!", "green");
     } else if (Math.abs(offBEATDiff) < OK_THRESHOLD) {
-      showBeatMessage("Ok!");
+      showBeatMessage("Ok!", "yellow");
       COMBO += 1;
     } else {
-      showBeatMessage("bruh");
+      showBeatMessage("bruh", "red");
       comboFail();
     }
     // every Beat add score of 1000
@@ -163,7 +171,9 @@ class RhytmInterval {
     if (currentArrow.state === ARROW_STATE.PASSED) {
       addComboScore(100);
       COMBO++;
+      showBeatMessage("hit!", "green");
     } else {
+      showBeatMessage("miss!", "red");
       comboFail();
     }
 
@@ -171,11 +181,6 @@ class RhytmInterval {
     if (this.currentArrowIdx === this.arrows.length) {
       this.arrowsFinished = true;
     }
-  }
-
-  destroy() {
-    // clearTimeout(this.timeoutId);
-    // this.onDestroy();
   }
 }
 // ===================================================================================================================================
@@ -233,7 +238,14 @@ function draw() {
       (CURRENT_TIME - CURRENT_INTERVAL.memorizedTimestamp) % duration;
     let progress = elapsed / duration;
     let currentX = LINE_START_X + progress * LINE_LEN;
+    push();
+    if (!CURRENT_INTERVAL.arrowsFinished) {
+      stroke(150);
+    } else {
+      strokeWeight(2);
+    }
     ellipse(currentX, LINE_Y, 20, 20);
+    pop();
     // ------------------------------------------------------------
 
     // arrows
@@ -285,9 +297,9 @@ let setIntervalId = 0;
 function setupIntervalCreation() {
   const intervalLogic = () => {
     if (CURRENT_INTERVAL) {
-      if(!CURRENT_INTERVAL.BEATchecked){
-        comboFail()
-        showBeatMessage('beat missed!')
+      if (!CURRENT_INTERVAL.BEATchecked) {
+        comboFail();
+        showBeatMessage("beat missed!", "red");
       }
       CURRENT_INTERVAL = null;
     }
@@ -320,10 +332,9 @@ function setupIntervalCreation() {
 function keyPressed(event) {
   console.log(event);
   if (event.code === "Space") {
-
     if (CURRENT_INTERVAL && !CURRENT_INTERVAL.BEATchecked) {
       if (!CURRENT_INTERVAL.arrowsFinished) {
-        console.log("cannot BEAT before arrows");
+        showBeatMessage("press arrows first!");
       } else {
         CURRENT_INTERVAL.checkBeat(CURRENT_TIME);
       }
